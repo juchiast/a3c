@@ -1,26 +1,23 @@
-import pygame
+import math, random, time, sys, pygame
 import numpy as np
-import math
-import random
-import pygame
-import time
-import sys
 import pygame.surfarray as surf
 from pygame.locals import *
 
-pygame.init()
-width = 800
-vertex_size = 40
-height = 600
-step = 20
-fps = 30
-clock = pygame.time.Clock()
-font = pygame.font.Font('./Ubuntu-R.ttf', 15)
 black = (0,0,0)
 white = (255,255,255)
 red = (255,0,0)
 gandalf = (200, 200, 200)
 green = (0, 120, 0)
+width = 800
+vertex_size = 40
+height = 600
+step = 20
+fps = 30
+
+pygame.init()
+clock = pygame.time.Clock()
+font = pygame.font.Font('./Ubuntu-R.ttf', 15)
+fc = [font.render(str(i), 2, white) for i in range(1000)]
 
 def dist(u, v):
     math.sqrt((u[0] - v[0])**2 + (u[1] - v[1])**2)
@@ -30,7 +27,6 @@ class Visualizer:
         vertex = [(random.randrange(width), random.randrange(height)) for _ in range(n)]
 
         length = dict(map(lambda x: (x, dist(vertex[x[0]], vertex[x[1]])), edges))
-
 
         self.edges = edges
         self.length = length
@@ -71,14 +67,12 @@ class Visualizer:
         for i, pos in enumerate(self.vertex):
             color = green if i in self.circles else black
             pygame.draw.circle(self.screen, color, pos, vertex_size)
-            text = font.render(str(i), 1, white)
-            self.screen.blit(text, pos)
+            self.screen.blit(fc[i], pos)
 
         for pos in cars:
             pygame.draw.rect(self.screen, red, (pos[0], pos[1], 5, 5))
 
         for num, pos in zip(waits, self.vertex):
-            text = font.render(str(num), 1, white)
-            self.screen.blit(text, (pos[0] - 10, pos[1] - 10))
+            self.screen.blit(fc[num], (pos[0] - 10, pos[1] - 10))
 
         pygame.display.update()
