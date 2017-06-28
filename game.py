@@ -28,7 +28,6 @@ class Graph:
     def read(self, file_path, display=False):
         with open(file_path, 'r') as f:
             n, m = list(map(int, f.readline().split()))
-            print(n, m)
             edges = [tuple(map(int, f.readline().split())) for _ in range(m)]
             circles = list(map(int, f.readline().split()))
             limit = int(f.readline())

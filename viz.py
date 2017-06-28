@@ -2,6 +2,7 @@ import math, random, time, sys, pygame
 import numpy as np
 import pygame.surfarray as surf
 from pygame.locals import *
+from pygame.draw import *
 
 black = (0,0,0)
 white = (255,255,255)
@@ -56,21 +57,21 @@ class Visualizer:
 
     def paint(self, cars=[], activated=[], waits=[]):
         activated = set(activated)
-        pygame.draw.rect(self.screen, white, (0, 0, width, height))
+        rect(self.screen, white, (0, 0, width, height))
 
         for u, v in self.edges:
-            pygame.draw.line(self.screen, gandalf, self.vertex[u], self.vertex[v], 2)
+            line(self.screen, gandalf, self.vertex[u], self.vertex[v], 2)
             if (u, v) in activated:
                 x = (np.array(self.vertex[u]) + np.array(self.vertex[v])) / 2.0
-                pygame.draw.line(self.screen, green, x, self.vertex[v], 2)
+                line(self.screen, green, x, self.vertex[v], 2)
 
         for i, pos in enumerate(self.vertex):
             color = green if i in self.circles else black
-            pygame.draw.circle(self.screen, color, pos, vertex_size)
+            circle(self.screen, color, pos, vertex_size)
             self.screen.blit(fc[i], pos)
 
         for pos in cars:
-            pygame.draw.rect(self.screen, red, (pos[0], pos[1], 5, 5))
+            rect(self.screen, red, (pos[0], pos[1], 5, 5))
 
         for num, pos in zip(waits, self.vertex):
             self.screen.blit(fc[num], (pos[0] - 10, pos[1] - 10))
