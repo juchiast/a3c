@@ -53,10 +53,11 @@ class Visualizer:
                 if ev.type == pygame.MOUSEBUTTONUP:
                     pos = pygame.mouse.get_pos()
                     i = get_node(self.vertex, pos)
-                    if i:
+                    if i is not None:
                         self.selected_node = i
-                    elif self.selected_node:
+                    elif self.selected_node is not None:
                         self.vertex[self.selected_node] = pos
+                        self.selected_node = None
 
 
             self.paint(points, activated, waits)
