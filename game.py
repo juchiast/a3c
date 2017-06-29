@@ -2,7 +2,7 @@ import random
 import viz
 from itertools import product
 
-SPAWN_LIMIT = 25
+SPAWN_LIMIT = 70
 random.seed()
 
 class Car:

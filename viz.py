@@ -21,33 +21,44 @@ font = pygame.font.Font('./Ubuntu-R.ttf', 15)
 fc = [font.render(str(i), 2, white) for i in range(1000)]
 
 def dist(u, v):
-    math.sqrt((u[0] - v[0])**2 + (u[1] - v[1])**2)
+    return math.sqrt((u[0] - v[0])**2 + (u[1] - v[1])**2)
+
+def calc_len(vertex, edges):
+    return dict(map(lambda x: (x, dist(vertex[x[0]], vertex[x[1]])), edges))
+
+def get_node(vertex, pos):
+    for i, x in enumerate(vertex):
+        if dist(pos, x) < vertex_size:
+            return i
+    return None
 
 class Visualizer:
     def __init__(self, n, edges, circles):
         vertex = [(random.randrange(width), random.randrange(height)) for _ in range(n)]
 
-        length = dict(map(lambda x: (x, dist(vertex[x[0]], vertex[x[1]])), edges))
-
         self.edges = edges
-        self.length = length
         self.vertex = vertex
         self.circles = set(circles)
         self.updated = False
+        self.selected_node = None
 
     def update(self, activated, actions, waits):
-        if any(ev.type == pygame.QUIT for ev in pygame.event.get()):
-            pygame.display.quit()
-            pygame.quit()
-            sys.exit()
-
-        if not self.updated:
-            self.updated = True
-            self.screen = pygame.display.set_mode((width, height))
-            pygame.display.set_caption('Anonymous')
-
         points = list(map(lambda x: self.vertex[x[0]], actions))
         for f in range(step):
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT:
+                    pygame.display.quit()
+                    pygame.quit()
+                    sys.exit()
+                if ev.type == pygame.MOUSEBUTTONUP:
+                    pos = pygame.mouse.get_pos()
+                    i = get_node(self.vertex, pos)
+                    if i:
+                        self.selected_node = i
+                    elif self.selected_node:
+                        self.vertex[self.selected_node] = pos
+
+
             self.paint(points, activated, waits)
             clock.tick(fps)
             for (i, (s, t)) in enumerate(actions):
@@ -55,7 +66,12 @@ class Visualizer:
                 v = np.array(self.vertex[t])
                 points[i] = tuple(map(int, u + (f/step)*(v - u)))
 
-    def paint(self, cars=[], activated=[], waits=[]):
+    def paint(self, cars=[], activated=[], waits=[],):
+        if not self.updated:
+            self.updated = True
+            self.screen = pygame.display.set_mode((width, height))
+            pygame.display.set_caption('Anonymous')
+
         activated = set(activated)
         rect(self.screen, white, (0, 0, width, height))
 
@@ -67,6 +83,7 @@ class Visualizer:
 
         for i, pos in enumerate(self.vertex):
             color = green if i in self.circles else black
+            color = red if self.selected_node == i else color
             circle(self.screen, color, pos, vertex_size)
             self.screen.blit(fc[i], pos)
 
