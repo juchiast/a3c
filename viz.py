@@ -12,7 +12,7 @@ blue = (0,0,255)
 gandalf = (200, 200, 200)
 green = (0, 120, 0)
 width = 800
-vertex_size = 40
+vertex_size = 20
 height = 600
 step = 20
 fps = 30
@@ -96,24 +96,24 @@ class Visualizer:
         rect(self.screen, white, (0, 0, width, height))
 
         for u, v in self.edges:
-            line(self.screen, gandalf, self.vertex[u], self.vertex[v], 2)
-            if (u, v) in activated:
-                x = (np.array(self.vertex[u]) + np.array(self.vertex[v])) / 2.0
-                line(self.screen, green, x, self.vertex[v], 2)
+            line(self.screen, gandalf, self.vertex[u], self.vertex[v], 10)
+
 
         for i, pos in enumerate(self.vertex):
-            color = green if i in self.circles else black
+            color = green if i in self.circles else blue
             color = red if self.selected_node == i else color
             circle(self.screen, color, pos, vertex_size)
-            self.screen.blit(fc[i], pos)
+            #self.screen.blit(fc[i], (pos[0] - 4, pos[1] - 7))
 
         for pos in cars:
             rect(self.screen, red, (pos[0], pos[1], 5, 5))
 
         for num, edge in zip(waits, self.edges):
             a, b = self.vertex[edge[0]], self.vertex[edge[1]]
-            pos = (int(b[0] - (b[0] - a[0]) / 4), int(b[1] - (b[1] - a[1]) / 4))
-            circle(self.screen, black, pos, 15)
-            self.screen.blit(fc[num], (pos[0] - 10, pos[1] - 10))
+            l = dist(a, b)
+            pos = (int(b[0] - (b[0] - a[0])/l * 50), int(b[1] - (b[1] - a[1]) / l * 50))
+            color = green if edge in activated else black
+            circle(self.screen, color, pos, 15)
+            self.screen.blit(fc[num], (pos[0] - 4, pos[1] - 7))
 
         pygame.display.update()

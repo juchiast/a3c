@@ -2,7 +2,7 @@ import random
 import viz
 from itertools import product
 
-SPAWN_LIMIT = 70
+SPAWN_LIMIT = 50
 random.seed()
 
 class Car:
@@ -69,11 +69,11 @@ class Graph:
             self.viz = viz.Visualizer(n, edges, circles)
 
     def get_state(self):
-        s = sum(self.car_count) + 1e-4
+        s = self.limit
         car = [x for x in self.car_count]
         off = [x for x in self.off_count]
         for i in range(len(car)):
-            car[i] /= s
+            car[i] = min(2, car[i]/s)
             off[i] = min(1, off[i] / 4)
         return car + off
 
@@ -127,7 +127,7 @@ class Graph:
         self.cars = list(filter(lambda car: not car.finished(), self.cars))
         if self.display:
             self.viz.update(edges, moves, self.car_count)
-        return (2*len(finished) - sum(waits)) / 100
+        return (0*len(finished) - sum(waits)) / 100
 
 if __name__ == "__main__":
     g = Graph().read('graph.txt', True)

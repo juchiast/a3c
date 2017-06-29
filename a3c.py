@@ -9,18 +9,19 @@ import game
 from keras.models import *
 from keras.layers import *
 from keras import backend as K
+import sys
 
 #-- constants
 ENV = 'CartPole-v0'
 
 RUN_TIME = 30
-THREADS = 1
+THREADS = 4
 OPTIMIZERS = 1
 THREAD_DELAY = 0.001
 
 GAMMA = 0.99
 
-N_STEP_RETURN = 8
+N_STEP_RETURN = 16
 GAMMA_N = GAMMA ** N_STEP_RETURN
 
 EPS_START = 0.4
@@ -28,10 +29,13 @@ EPS_STOP  = .15
 EPS_STEPS = 75000
 
 MIN_BATCH = 128
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 5e-3
 
 LOSS_V = .5            # v loss coefficient
-LOSS_ENTROPY = .1     # entropy coefficient
+LOSS_ENTROPY = .01     # entropy coefficient
+
+loss_history = []
+reward_history = []
 
 #---------
 class Brain:
@@ -58,7 +62,7 @@ class Brain:
     def _build_model(self):
 
         l_input = Input( batch_shape=(None, self.num_input) )
-        l_dense = Dense(32, activation='relu')(l_input)
+        l_dense = Dense(128, activation='relu')(l_input)
 
         out = []
 
@@ -96,10 +100,11 @@ class Brain:
         loss_total = tf.reduce_mean(loss_policy + loss_value + entropy)
 
         optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE, decay=.99)
-        gvs = optimizer.compute_gradients(loss_total)
-        capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
-        minimize = optimizer.apply_gradients(capped_gvs)
+        #gvs = optimizer.compute_gradients(loss_total)
+        #capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
+        #minimize = optimizer.apply_gradients(capped_gvs)
 
+        minimize = optimizer.minimize(loss_total)
         return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy)]
 
     def optimize(self):
@@ -127,8 +132,11 @@ class Brain:
         r = r + GAMMA_N * v * s_mask    # set v to 0 where s_ is terminal state
 
         s_t, a_t, r_t, minimize, loss = self.graph
-        print(self.session.run([minimize,loss], feed_dict={s_t: s, a_t: a, r_t: r}))
+        _, loss = self.session.run([minimize,loss], feed_dict={s_t: s, a_t: a, r_t: r})
 
+        print("LOSS = ", loss)
+
+        loss_history.append(loss[0])
         #for layer in brain.model.layers:
         #    print(layer.get_weights())
 
@@ -164,6 +172,7 @@ class Brain:
             return pv[-1]
 
 #---------
+printp = False
 frames = 0
 class Agent:
     def __init__(self,deg, eps_start, eps_end, eps_steps):
@@ -193,12 +202,15 @@ class Agent:
                     a.append(0)
                 else:
                     a.append(random.randint(0,x-1))
+            if printp:
+                print('RANDOM')
             return a
         else:
             s = np.array([s])
             p = brain.predict_p(s)
 
-            #print(p)
+            if printp:
+                print(p)
 
             # a = np.argmax(p)
             a = []
@@ -236,7 +248,7 @@ class Agent:
         for i in reversed(range(len(self.memory))):
             self.R = self.R * GAMMA + self.memory[i][2]
 
-        print("SELF R", self.R)
+        #print("SELF R", self.R)
         #print("REAL R", tmpR)
 
         if s_ is None:
@@ -281,8 +293,6 @@ class Environment(threading.Thread):
         R = 0
         Rt = 0
 
-        step = 0
-
         while True:         
             time.sleep(THREAD_DELAY) # yield 
 
@@ -305,12 +315,12 @@ class Environment(threading.Thread):
 
             if done or self.stop_signal:
                 break
-
-            step += 1
             
-            if step % 100 == 0:
-                print("Step ", step)
+            if frames % 100 == 0:
+                print("Step ", frames)
                 print("Reward = ", Rt)
+                reward_history.append(Rt)
+                sys.stdout.flush()
                 Rt = 0
 
 
@@ -372,4 +382,14 @@ print("Training finished")
 for layer in brain.model.layers:
     print(layer.get_weights())
 
+import matplotlib.pyplot as plt
+plt.plot(loss_history)
+plt.ylabel('some numbers')
+plt.show()
+
+plt.plot(reward_history)
+plt.show()
+
+printp = True
 env_test.run()
+
