@@ -3,6 +3,7 @@ import numpy as np
 import pygame.surfarray as surf
 from pygame.locals import *
 from pygame.draw import *
+import os.path
 
 black = (0,0,0)
 white = (255,255,255)
@@ -33,9 +34,26 @@ def get_node(vertex, pos):
             return i
     return None
 
+def load_cache():
+    if not os.path.isfile('graphcache.txt'):
+        return None
+    with open('graphcache.txt', 'r') as f:
+        res = f.readlines()
+        return list(map(lambda s: tuple(map(int, s.split())), res))
+
+def save_cache(vertex):
+    with open('graphcache.txt', 'w') as f:
+        for pos in vertex:
+            f.write('%d %d\n' % pos)
+
 class Visualizer:
     def __init__(self, n, edges, circles):
-        vertex = [(random.randrange(width), random.randrange(height)) for _ in range(n)]
+        vertex = load_cache()
+        if not vertex:
+            vertex = [(random.randrange(width), random.randrange(height)) for _ in range(n)]
+        if len(vertex) != n:
+            vertex = [(random.randrange(width), random.randrange(height)) for _ in range(n)]
+        save_cache(vertex)
 
         self.edges = edges
         self.vertex = vertex
@@ -59,6 +77,7 @@ class Visualizer:
                     elif self.selected_node is not None:
                         self.vertex[self.selected_node] = pos
                         self.selected_node = None
+                        save_cache(self.vertex)
 
             self.paint(points, activated, waits)
             clock.tick(fps)
