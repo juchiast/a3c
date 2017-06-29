@@ -7,6 +7,7 @@ from pygame.draw import *
 black = (0,0,0)
 white = (255,255,255)
 red = (255,0,0)
+blue = (0,0,255)
 gandalf = (200, 200, 200)
 green = (0, 120, 0)
 width = 800
@@ -18,7 +19,7 @@ fps = 30
 pygame.init()
 clock = pygame.time.Clock()
 font = pygame.font.Font('./Ubuntu-R.ttf', 15)
-fc = [font.render(str(i), 2, white) for i in range(1000)]
+fc = [font.render(str(i), 2, white) for i in range(10000)]
 
 def dist(u, v):
     return math.sqrt((u[0] - v[0])**2 + (u[1] - v[1])**2)
@@ -59,7 +60,6 @@ class Visualizer:
                         self.vertex[self.selected_node] = pos
                         self.selected_node = None
 
-
             self.paint(points, activated, waits)
             clock.tick(fps)
             for (i, (s, t)) in enumerate(actions):
@@ -67,7 +67,7 @@ class Visualizer:
                 v = np.array(self.vertex[t])
                 points[i] = tuple(map(int, u + (f/step)*(v - u)))
 
-    def paint(self, cars=[], activated=[], waits=[],):
+    def paint(self, cars=[], activated=[], waits=[]):
         if not self.updated:
             self.updated = True
             self.screen = pygame.display.set_mode((width, height))
@@ -91,7 +91,10 @@ class Visualizer:
         for pos in cars:
             rect(self.screen, red, (pos[0], pos[1], 5, 5))
 
-        for num, pos in zip(waits, self.vertex):
+        for num, edge in zip(waits, self.edges):
+            a, b = self.vertex[edge[0]], self.vertex[edge[1]]
+            pos = (int(b[0] - (b[0] - a[0]) / 4), int(b[1] - (b[1] - a[1]) / 4))
+            circle(self.screen, black, pos, 15)
             self.screen.blit(fc[num], (pos[0] - 10, pos[1] - 10))
 
         pygame.display.update()

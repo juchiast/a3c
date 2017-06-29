@@ -70,11 +70,12 @@ class Graph:
 
     def get_state(self):
         s = sum(self.car_count) + 1e-4
+        car = [x for x in self.car_count]
         off = [x for x in self.off_count]
-        for i in range(len(self.car_count)):
-            self.car_count[i] /= s
+        for i in range(len(car)):
+            car[i] /= s
             off[i] = min(1, off[i] / 4)
-        return self.car_count + off
+        return car + off
 
     def spawn(self):
         limit = random.randint(1, SPAWN_LIMIT)
@@ -125,7 +126,7 @@ class Graph:
         finished = list(filter(lambda car: car.finished(), self.cars))
         self.cars = list(filter(lambda car: not car.finished(), self.cars))
         if self.display:
-            self.viz.update(edges, moves, waits)
+            self.viz.update(edges, moves, self.car_count)
         return (2*len(finished) - sum(waits)) / 100
 
 if __name__ == "__main__":
