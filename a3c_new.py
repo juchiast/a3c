@@ -13,7 +13,7 @@ import sys
 
 #-- constants
 
-RUN_TIME = 2
+RUN_TIME = 120
 THREADS = 8
 OPTIMIZERS = 1
 THREAD_DELAY = 0.001
@@ -24,29 +24,24 @@ N_STEP_RETURN = 16
 GAMMA_N = GAMMA ** N_STEP_RETURN
 
 EPS_START = 0.4
-EPS_STOP  = .15
+EPS_STOP  = 0.15
 EPS_STEPS = 75000
 
 MIN_BATCH = 64
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-3
 
 LOSS_V = 0.5            # v loss coefficient
 LOSS_ENTROPY = .01     # entropy coefficient
 
 loss_history = []
 reward_history = []
-frames = 0
 
-CHECKPOINT_DIR = "checkpoints"
 #---------
 class Brain:
     train_queue = [ [], [], [], [], [] ]    # s, a, r, s', s' terminal mask
     lock_queue = threading.Lock()
 
-    def __init__(self, deg, load_checkpoint = True):
-        global frames
-        global wall_t
-        frames = 0
+    def __init__(self, deg):
         self.session = tf.Session()
         K.set_session(self.session)
         K.manual_variable_initialization(True)
@@ -60,18 +55,6 @@ class Brain:
 
         self.session.run(tf.global_variables_initializer())
         self.default_graph = tf.get_default_graph()
-        self.saver = tf.train.Saver()
-        if load_checkpoint:
-            checkpoint = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
-            if checkpoint and checkpoint.model_checkpoint_path:
-                self.saver.restore(self.session, checkpoint.model_checkpoint_path)
-                print("checkpoint loaded:", checkpoint.model_checkpoint_path)
-                tokens = checkpoint.model_checkpoint_path.split("-")
-                # set global step
-                frames = int(tokens[1])
-                print(">>> global step set: ", frames)
-        else:
-            print("Could not find old checkpoint")
 
         self.default_graph.finalize()    # avoid modifications
 
@@ -102,36 +85,26 @@ class Brain:
         r_t = tf.placeholder(tf.float32, shape=(None, 1)) # not immediate, but discounted n step reward
         
         pv = model(s_t)
+
         v = pv.pop()
 
-        p = tf.concat(pv, axis = 1)
-        sa = tf.split(a_t,self.deg,1)
+        p = tf.concat(pv,1)
 
-
-        pa = []
-        for i in range(len(self.deg)):
-            pa.append(tf.reduce_sum(sa[i]*pv[i],axis=1, keep_dims = True))
-
-        print(pa)
-
-        pa = tf.concat(pa,axis = 1)
-
-        log_prob = tf.reduce_sum(tf.log(pa + 1e-10) , axis=1, keep_dims = True)
-        
+        log_prob = tf.log( tf.reduce_sum(p * a_t, axis=1, keep_dims=True) + 1e-10)
         advantage = r_t - v
 
         loss_policy = - log_prob * tf.stop_gradient(advantage)                                    # maximize policy
         loss_value  = LOSS_V * tf.square(advantage)                                                # minimize value error
-        entropy = LOSS_ENTROPY * tf.reduce_sum(p * tf.log(p + 1e-10), axis=1, keep_dims=True)    # maximize entropy (regularization)
+        entropy = LOSS_ENTROPY * tf.reduce_sum((p + 1e-10)* tf.log(p + 1e-10), axis=1, keep_dims=True)    # maximize entropy (regularization)
 
         loss_total = tf.reduce_mean(loss_policy + loss_value + entropy)
 
         optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE, decay=.99)
-        #gvs = optimizer.compute_gradients(loss_total)
-        #capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
-        #minimize = optimizer.apply_gradients(capped_gvs)
+        gvs = optimizer.compute_gradients(loss_total)
+        capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
+        minimize = optimizer.apply_gradients(capped_gvs)
 
-        minimize = optimizer.minimize(loss_total)
+        #minimize = optimizer.minimize(loss_total)
         return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy)]
 
     def optimize(self):
@@ -163,7 +136,7 @@ class Brain:
 
         print("LOSS = ", loss)
 
-        loss_history.append(loss[0])
+        loss_history.append(loss)
         reward_history.append(loss[1])
         #for layer in brain.model.layers:
         #    print(layer.get_weights())
@@ -201,7 +174,7 @@ class Brain:
 
 #---------
 printp = False
-
+frames = 0
 class Agent:
     def __init__(self,deg, eps_start, eps_end, eps_steps):
         self.eps_start = eps_start
@@ -264,6 +237,8 @@ class Agent:
         for i in range(len(self.deg)):
             a_cats[offset + a[i]] = 1 
             offset += self.deg[i]
+
+        #print("e ",s,a,r,s_)
 
         self.memory.append( (s, a_cats, r, s_) )
 
@@ -404,9 +379,7 @@ for o in opts:
     o.stop()
 for o in opts:
     o.join()
-# write wall time
 
-brain.saver.save(brain.session, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = frames)
 print("Training finished")
 
 for layer in brain.model.layers:

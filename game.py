@@ -2,7 +2,7 @@ import random
 import viz
 from itertools import product
 
-SPAWN_LIMIT = 50
+SPAWN_LIMIT = 30
 random.seed()
 
 class Car:
@@ -70,19 +70,24 @@ class Graph:
 
     def get_state(self):
         s = self.limit
-        car = [x for x in self.car_count]
-        off = [x for x in self.off_count]
-        for i in range(len(car)):
-            car[i] = min(2, car[i]/s)
-            off[i] = min(1, off[i] / 4)
-        return car + off
+        empty = [(1 if x > 0 else 0) for x in self.car_count]
+        car = [x/s for x in self.car_count]
+        off = [x/4 for x in self.off_count]
+        #for i in range(len(car)):
+        #    car[i] = min(2, car[i]/s)
+        #    off[i] = min(2, off[i] / 4)
+        return empty + car + off
 
     def spawn(self):
-        limit = random.randint(1, SPAWN_LIMIT)
+        #limit = random.randint(1, SPAWN_LIMIT)
+        limit = SPAWN_LIMIT
         for _ in range(limit):
             s, t = random.sample(range(self.n), 2)
+            #s = 0
+            #t = 3
             if self.paths[s][t]:
                 self.cars.append(Car(random.choice(self.paths[s][t])))
+                #self.cars.append(Car(self.paths[s][t][0]))
 
     def next(self, a):
         self.spawn()
@@ -127,7 +132,17 @@ class Graph:
         self.cars = list(filter(lambda car: not car.finished(), self.cars))
         if self.display:
             self.viz.update(edges, moves, self.car_count)
-        return (0*len(finished) - sum(waits)) / 100
+
+        #maxd = 0
+
+        #for c in self.cars:
+        #    maxd = max(maxd, c.delay/len(c.path)/SPAWN_LIMIT)
+
+        #print(maxd)
+
+        #return sum(finished)/SPAWN_LIMIT
+        return max(-1,(len(self.cars)*0.1-sum(waits))/SPAWN_LIMIT)
+
 
 if __name__ == "__main__":
     g = Graph().read('graph.txt', True)

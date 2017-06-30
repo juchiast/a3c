@@ -9,130 +9,125 @@ import game
 from keras.models import *
 from keras.layers import *
 from keras import backend as K
-import sys
 
 #-- constants
+ENV = 'CartPole-v0'
 
-RUN_TIME = 2
-THREADS = 8
+RUN_TIME = 60*5
+THREADS = 1
 OPTIMIZERS = 1
 THREAD_DELAY = 0.001
 
 GAMMA = 0.99
 
-N_STEP_RETURN = 16
+N_STEP_RETURN = 8
 GAMMA_N = GAMMA ** N_STEP_RETURN
 
 EPS_START = 0.4
 EPS_STOP  = .15
 EPS_STEPS = 75000
 
-MIN_BATCH = 64
-LEARNING_RATE = 1e-3
+MIN_BATCH = 128
+LEARNING_RATE = 5e-4
 
-LOSS_V = 0.5            # v loss coefficient
-LOSS_ENTROPY = .01     # entropy coefficient
+LOSS_V = .5            # v loss coefficient
+LOSS_ENTROPY = .1     # entropy coefficient
 
-loss_history = []
-reward_history = []
-frames = 0
-
-CHECKPOINT_DIR = "checkpoints"
 #---------
 class Brain:
     train_queue = [ [], [], [], [], [] ]    # s, a, r, s', s' terminal mask
     lock_queue = threading.Lock()
 
-    def __init__(self, deg, load_checkpoint = True):
-        global frames
-        global wall_t
-        frames = 0
+    def __init__(self, deg, model = None):
         self.session = tf.Session()
-        K.set_session(self.session)
-        K.manual_variable_initialization(True)
+
 
         self.deg = deg
         self.edge = sum(deg)
-        self.num_input = self.edge*3;
+        self.num_input = self.edge*2;
 
-        self.model = self._build_model()
-        self.graph = self._build_graph(self.model)
+        
+        if model == None:
+            K.set_session(self.session)
+            K.manual_variable_initialization(True)
 
-        self.session.run(tf.global_variables_initializer())
-        self.default_graph = tf.get_default_graph()
-        self.saver = tf.train.Saver()
-        if load_checkpoint:
-            checkpoint = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
-            if checkpoint and checkpoint.model_checkpoint_path:
-                self.saver.restore(self.session, checkpoint.model_checkpoint_path)
-                print("checkpoint loaded:", checkpoint.model_checkpoint_path)
-                tokens = checkpoint.model_checkpoint_path.split("-")
-                # set global step
-                frames = int(tokens[1])
-                print(">>> global step set: ", frames)
+            self.model = self._build_model()
+            self.graph = self._build_graph(self.model)
+
+            self.session.run(tf.global_variables_initializer())
+            self.default_graph = tf.get_default_graph()
+
+            #self.saver = tf.train.Saver(max_to_keep = 5)
+
+            self.default_graph.finalize()    # avoid modifications
+
+
+
         else:
-            print("Could not find old checkpoint")
+            self.saver.restore(self.session,model)
+            self.default_graph = tf.get_default_graph()
 
-        self.default_graph.finalize()    # avoid modifications
+            self.model = self.default_graph.get_tensor_by_name("model:0")
+            self.graph = restore_graph(self.default_graph)
+
+    def save(self, step):
+        self.saver.save(self.session,"model", global_step = step)
+
+    def restore_graph(self,graph):
+        s_t = graph.get_tensor_by_name("graph_s:0")
+        a_t = graph.get_tensor_by_name("graph_a:0")
+        r_t = graph.get_tensor_by_name("graph_r:0")
+        loss = graph.get_tensor_by_name("graph_loss:0")
+        minimize = graph.get_tensor_by_name("minimizer:0")
+        return s_a, a_t, r_t, minimize, loss
+
 
     def _build_model(self):
 
-        l_input = Input( batch_shape=(None, self.num_input) )
-        l_dense1 = Dense(256, activation='relu')(l_input)
-        l_dense2 = Dense(128, activation='relu')(l_dense1)
+        l_input = Input(batch_shape=(None, self.num_input) )
+        l_dense = Dense(32, activation='relu')(l_input)
 
         out = []
 
         #actions
         for e in self.deg:
-            out.append(Dense(e, activation='softmax')(l_dense2))
+            out.append(Dense(e, activation='softmax')(l_dense))
         
         #value
-        out.append(Dense(1, activation='linear')(l_dense2))
+        out.append(Dense(1, activation='linear')(l_dense))
 
 
-        model = Model(inputs=[l_input], outputs=out)
+        model = Model(name = "model",inputs=[l_input], outputs=out)
         model._make_predict_function()    # have to initialize before threading
 
         return model
 
     def _build_graph(self, model):
-        s_t = tf.placeholder(tf.float32, shape=(None, self.num_input))
-        a_t = tf.placeholder(tf.float32, shape=(None, self.edge))
-        r_t = tf.placeholder(tf.float32, shape=(None, 1)) # not immediate, but discounted n step reward
+        s_t = tf.placeholder(tf.float32, shape=(None, self.num_input), name = "graph_s")
+        a_t = tf.placeholder(tf.float32, shape=(None, self.edge), name = "graph_t")
+        r_t = tf.placeholder(tf.float32, shape=(None, 1), name = "graph_r") # not immediate, but discounted n step reward
         
         pv = model(s_t)
+
         v = pv.pop()
 
-        p = tf.concat(pv, axis = 1)
-        sa = tf.split(a_t,self.deg,1)
+        p = tf.concat(pv,1)
 
-
-        pa = []
-        for i in range(len(self.deg)):
-            pa.append(tf.reduce_sum(sa[i]*pv[i],axis=1, keep_dims = True))
-
-        print(pa)
-
-        pa = tf.concat(pa,axis = 1)
-
-        log_prob = tf.reduce_sum(tf.log(pa + 1e-10) , axis=1, keep_dims = True)
-        
+        log_prob = tf.log( tf.reduce_sum(p * a_t, axis=1, keep_dims=True) + 1e-10)
         advantage = r_t - v
 
         loss_policy = - log_prob * tf.stop_gradient(advantage)                                    # maximize policy
         loss_value  = LOSS_V * tf.square(advantage)                                                # minimize value error
         entropy = LOSS_ENTROPY * tf.reduce_sum(p * tf.log(p + 1e-10), axis=1, keep_dims=True)    # maximize entropy (regularization)
 
-        loss_total = tf.reduce_mean(loss_policy + loss_value + entropy)
+        loss_total = tf.reduce_mean(loss_policy + loss_value + entropy, name = "graph_loss")
 
         optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE, decay=.99)
-        #gvs = optimizer.compute_gradients(loss_total)
-        #capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
-        #minimize = optimizer.apply_gradients(capped_gvs)
+        gvs = optimizer.compute_gradients(loss_total)
+        capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
+        minimize = optimizer.apply_gradients(capped_gvs, name = "minimizer")
 
-        minimize = optimizer.minimize(loss_total)
-        return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy)]
+        return s_t, a_t, r_t, minimize, loss_total
 
     def optimize(self):
         if len(self.train_queue[0]) < MIN_BATCH:
@@ -159,12 +154,8 @@ class Brain:
         r = r + GAMMA_N * v * s_mask    # set v to 0 where s_ is terminal state
 
         s_t, a_t, r_t, minimize, loss = self.graph
-        _, loss = self.session.run([minimize,loss], feed_dict={s_t: s, a_t: a, r_t: r})
+        print(self.session.run([minimize,loss], feed_dict={s_t: s, a_t: a, r_t: r}))
 
-        print("LOSS = ", loss)
-
-        loss_history.append(loss[0])
-        reward_history.append(loss[1])
         #for layer in brain.model.layers:
         #    print(layer.get_weights())
 
@@ -200,8 +191,7 @@ class Brain:
             return pv[-1]
 
 #---------
-printp = False
-
+frames = 0
 class Agent:
     def __init__(self,deg, eps_start, eps_end, eps_steps):
         self.eps_start = eps_start
@@ -230,15 +220,12 @@ class Agent:
                     a.append(0)
                 else:
                     a.append(random.randint(0,x-1))
-            if printp:
-                print('RANDOM')
             return a
         else:
             s = np.array([s])
             p = brain.predict_p(s)
 
-            if printp:
-                print(p)
+            #print(p)
 
             # a = np.argmax(p)
             a = []
@@ -276,7 +263,7 @@ class Agent:
         for i in reversed(range(len(self.memory))):
             self.R = self.R * GAMMA + self.memory[i][2]
 
-        #print("SELF R", self.R)
+        print("SELF R", self.R)
         #print("REAL R", tmpR)
 
         if s_ is None:
@@ -343,13 +330,15 @@ class Environment(threading.Thread):
 
             if done or self.stop_signal:
                 break
+
             
             if frames % 100 == 0:
-                print("Step ", frames)
+                print("Step ", step)
                 print("Reward = ", Rt)
-                #reward_history.append(Rt)
-                sys.stdout.flush()
                 Rt = 0
+
+            #if frames % 1000 == 0:
+            #    brain.save()
 
 
         print("Total R:", R)
@@ -376,16 +365,25 @@ class Optimizer(threading.Thread):
         self.stop_signal = True
 
 #-- main
+
+import sys
+
+print("START")
+
 env_test = Environment(render=True, eps_start=0., eps_end=0.)
 
 NONE_STATE = np.zeros(sum(env_test.env.deg)*2)
 
 brain = Brain(env_test.env.deg)    # brain is global in A3C
 
+print("DONE")
+
 envs = [Environment() for i in range(THREADS)]
 opts = [Optimizer() for i in range(OPTIMIZERS)]
 
 print("Animation? ", envs[0].env.display)
+
+
 
 for o in opts:
     o.start()
@@ -404,22 +402,10 @@ for o in opts:
     o.stop()
 for o in opts:
     o.join()
-# write wall time
 
-brain.saver.save(brain.session, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = frames)
 print("Training finished")
 
 for layer in brain.model.layers:
     print(layer.get_weights())
 
-import matplotlib.pyplot as plt
-plt.plot(loss_history)
-plt.ylabel('some numbers')
-plt.show()
-
-plt.plot(reward_history)
-plt.show()
-
-printp = True
 env_test.run()
-
