@@ -2,7 +2,7 @@ import random
 import viz
 from itertools import product
 
-SPAWN_LIMIT = 30
+SPAWN_LIMIT = 10
 random.seed()
 
 class Car:
@@ -89,6 +89,9 @@ class Graph:
                 self.cars.append(Car(random.choice(self.paths[s][t])))
                 #self.cars.append(Car(self.paths[s][t][0]))
 
+    def game_over(self):
+        return len(self.cars)>100
+
     def next(self, a):
         self.spawn()
 
@@ -134,6 +137,7 @@ class Graph:
                     self.car_count[self.edges_map[(a, b)]] += 1
         finished = list(filter(lambda car: car.finished(), self.cars))
         self.cars = list(filter(lambda car: not car.finished(), self.cars))
+
         if self.display:
             self.viz.update(edges, moves, self.car_count)
 
@@ -145,7 +149,7 @@ class Graph:
         #print(maxd)
 
         #return sum(finished)/SPAWN_LIMIT
-        return max(-1,(len(self.cars)*0.5-sum(waits))/SPAWN_LIMIT)
+        return max(-1,(len(self.cars)*0.5-sum(waits))/SPAWN_LIMIT/self.n)
 
 
 if __name__ == "__main__":

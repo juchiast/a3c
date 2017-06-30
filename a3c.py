@@ -13,24 +13,20 @@ import sys
 
 #-- constants
 
-RUN_TIME = 600
+RUN_TIME = 300
 THREADS = 8
 OPTIMIZERS = 1
 THREAD_DELAY = 0
 
 GAMMA = 0.99
 
-N_STEP_RETURN = 8
+N_STEP_RETURN = 16
 GAMMA_N = GAMMA ** N_STEP_RETURN
-
-EPS_START = 0
-EPS_STOP  = 0
-EPS_STEPS = 75000
 
 MIN_BATCH = 64
 LEARNING_RATE = 1e-3
 
-LOSS_V = 0.5            # v loss coefficient
+LOSS_V = 1            # v loss coefficient
 LOSS_ENTROPY = .01     # entropy coefficient
 
 loss_history = []
@@ -77,17 +73,17 @@ class Brain:
     def _build_model(self):
 
         l_input = Input( batch_shape=(None, self.num_input) )
-        l_dense1 = Dense(256, activation='relu')(l_input)
-        l_dense2 = Dense(128, activation='relu')(l_dense1)
+        l_dense1 = Dense(512, activation='relu')(l_input)
+
 
         out = []
 
         #actions
         for e in self.deg:
-            out.append(Dense(e, activation='softmax')(l_dense2))
+            out.append(Dense(e, activation='softmax')(l_dense1))
         
         #value
-        out.append(Dense(1, activation='linear')(l_dense2))
+        out.append(Dense(1, activation='linear')(l_dense1))
 
 
         model = Model(inputs=[l_input], outputs=out)
@@ -111,8 +107,6 @@ class Brain:
         for i in range(len(self.deg)):
             pa.append(tf.reduce_sum(sa[i]*pv[i],axis=1, keep_dims = True))
 
-        print(pa)
-
         pa = tf.concat(pa,axis = 1)
 
         log_prob = tf.reduce_sum(tf.log(pa + 1e-10) , axis=1, keep_dims = True)
@@ -131,7 +125,7 @@ class Brain:
         minimize = optimizer.apply_gradients(capped_gvs)
 
         #minimize = optimizer.minimize(loss_total)
-        return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy)]
+        return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy),tf.reduce_mean(advantage)]
 
     def optimize(self):
         if len(self.train_queue[0]) < MIN_BATCH:
@@ -202,53 +196,32 @@ class Brain:
 printp = False
 
 class Agent:
-    def __init__(self,deg, eps_start, eps_end, eps_steps):
-        self.eps_start = eps_start
-        self.eps_end   = eps_end
-        self.eps_steps = eps_steps
+    def __init__(self,deg):
         self.deg = deg
         self.edge = sum(deg)
 
         self.memory = []    # used for n_step return
         self.R = 0.
 
-    def getEpsilon(self):
-        if(frames >= self.eps_steps):
-            return self.eps_end
-        else:
-            return self.eps_start + frames * (self.eps_end - self.eps_start) / self.eps_steps    # linearly interpolate
-
     def act(self, s):
-        eps = self.getEpsilon()            
         global frames; frames = frames + 1
 
-        if random.random() < eps:
-            a = []
-            for x in self.deg:
-                if x == 0:
-                    a.append(0)
-                else:
-                    a.append(random.randint(0,x-1))
-            if printp:
-                print('RANDOM')
-            return a
-        else:
-            s = np.array([s])
-            p = brain.predict_p(s)
+        s = np.array([s])
+        p = brain.predict_p(s)
 
-            if printp:
-                print(p)
+        if printp:
+            print(p)
 
-            # a = np.argmax(p)
-            a = []
+        # a = np.argmax(p)
+        a = []
 
-            for i in range(len(self.deg)):
-                if self.deg[i] == 0:
-                    a.append(0)
-                else:
-                    a.append(np.random.choice(self.deg[i], p=p[i][0]))
+        for i in range(len(self.deg)):
+            if self.deg[i] == 0:
+                a.append(0)
+            else:
+                a.append(np.random.choice(self.deg[i], p=p[i][0]))
 
-            return a
+        return a
     
     def train(self, s, a, r, s_):
         def get_sample(memory, n):
@@ -302,12 +275,12 @@ class Agent:
 class Environment(threading.Thread):
     stop_signal = False
 
-    def __init__(self, render=False, eps_start=EPS_START, eps_end=EPS_STOP, eps_steps=EPS_STEPS):
+    def __init__(self, render=False):
         threading.Thread.__init__(self)
 
         self.render = render
         self.env = game.Graph().read("graph.txt",render)
-        self.agent = Agent(self.env.deg,eps_start, eps_end, eps_steps)
+        self.agent = Agent(self.env.deg)
 
     def reset(self):
         print("RESET!!")
@@ -329,10 +302,11 @@ class Environment(threading.Thread):
             r = self.env.next(a)
             s_ = self.env.get_state()
 
-            done = False
+            done = self.env.game_over()
 
-            #if done: # terminal state
-            #    s_ = None
+            if done: # terminal state
+                s_ = None
+                print("GAME OVER")
 
             self.agent.train(s, a, r, s_)
 
@@ -347,7 +321,6 @@ class Environment(threading.Thread):
                 print("Step ", frames)
                 print("Reward = ", Rt)
                 #reward_history.append(Rt)
-                sys.stdout.flush()
                 Rt = 0
 
 
@@ -375,9 +348,9 @@ class Optimizer(threading.Thread):
         self.stop_signal = True
 
 #-- main
-env_test = Environment(render=True, eps_start=0., eps_end=0.)
+env_test = Environment(render=True)
 
-NONE_STATE = np.zeros(sum(env_test.env.deg)*2)
+NONE_STATE = np.zeros(sum(env_test.env.deg)*3)
 
 brain = Brain(env_test.env.deg)    # brain is global in A3C
 
