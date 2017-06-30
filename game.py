@@ -21,7 +21,7 @@ class Car:
         self.delay += 1
 
     def finished(self):
-        return self.pos == len(self.path) - 1
+        return self.pos >= len(self.path)
 
 
 class Graph:
@@ -113,6 +113,10 @@ class Graph:
             a, b = car.path[car.pos-1], car.path[car.pos]
             wait = True
             if car.pos == 0 or (a, b) in edges or b in self.circles:
+                if car.pos == len(car.path) - 1:
+                    wait = False
+                    car.pos += 1
+                    continue
                 s = car.path[car.pos]
                 t = car.path[car.pos + 1]
                 if not count.get((s, t)):
