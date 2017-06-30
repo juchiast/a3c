@@ -5,6 +5,9 @@ from itertools import product
 SPAWN_LIMIT = 30
 random.seed()
 
+def ok():
+    return random.random() < 0.9
+
 class Car:
     def __init__(self, path):
         self.delay = 0
@@ -49,7 +52,7 @@ class Graph:
         for k, i, j in product(range(n), repeat=3):
             for u, v in product(paths[i][k], paths[k][j]):
                 x = set(u)
-                if all(y not in x for y in v[1:]):
+                if all(y not in x for y in v[1:]) and ok():
                     paths[i][j].append(u + v[1:])
 
         self.n = n

@@ -103,7 +103,7 @@ class Visualizer:
             color = green if i in self.circles else blue
             color = red if self.selected_node == i else color
             circle(self.screen, color, pos, vertex_size)
-            #self.screen.blit(fc[i], (pos[0] - 4, pos[1] - 7))
+            self.screen.blit(fc[i], (pos[0] - 4, pos[1] - 7))
 
         for pos in cars:
             rect(self.screen, red, (pos[0], pos[1], 5, 5))
@@ -111,9 +111,9 @@ class Visualizer:
         for num, edge in zip(waits, self.edges):
             a, b = self.vertex[edge[0]], self.vertex[edge[1]]
             l = dist(a, b)
-            pos = (int(b[0] - (b[0] - a[0])/l * 50), int(b[1] - (b[1] - a[1]) / l*50))
+            pos = (int(b[0] - (b[0] - a[0])/l * 32), int(b[1] - (b[1] - a[1]) / l*32))
             color = green if edge in activated else black
-            circle(self.screen, color, pos, 15)
-            self.screen.blit(fc[num], (pos[0] - 10, pos[1] - 10))
+            circle(self.screen, color, pos, 12)
+            self.screen.blit(fc[num], (pos[0] - 4, pos[1] - 7))
 
         pygame.display.update()
