@@ -145,7 +145,7 @@ class Graph:
         #print(maxd)
 
         #return sum(finished)/SPAWN_LIMIT
-        return max(-1,(len(self.cars)*0.1-sum(waits))/SPAWN_LIMIT)
+        return max(-1,(len(self.cars)*0.5-sum(waits))/SPAWN_LIMIT)
 
 
 if __name__ == "__main__":

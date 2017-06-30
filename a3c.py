@@ -13,18 +13,18 @@ import sys
 
 #-- constants
 
-RUN_TIME = 30
-THREADS = 4
+RUN_TIME = 600
+THREADS = 8
 OPTIMIZERS = 1
-THREAD_DELAY = 0.001
+THREAD_DELAY = 0
 
 GAMMA = 0.99
 
-N_STEP_RETURN = 16
+N_STEP_RETURN = 8
 GAMMA_N = GAMMA ** N_STEP_RETURN
 
-EPS_START = 0.4
-EPS_STOP  = .15
+EPS_START = 0
+EPS_STOP  = 0
 EPS_STEPS = 75000
 
 MIN_BATCH = 64
@@ -45,7 +45,6 @@ class Brain:
 
     def __init__(self, deg, load_checkpoint = True):
         global frames
-        global wall_t
         frames = 0
         self.session = tf.Session()
         K.set_session(self.session)
@@ -127,11 +126,11 @@ class Brain:
         loss_total = tf.reduce_mean(loss_policy + loss_value + entropy)
 
         optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE, decay=.99)
-        #gvs = optimizer.compute_gradients(loss_total)
-        #capped_gvs = [(tf.clip_by_value(grad, -1, 1), var) for grad, var in gvs]
-        #minimize = optimizer.apply_gradients(capped_gvs)
+        gvs = optimizer.compute_gradients(loss_total)
+        capped_gvs = [(tf.clip_by_value(grad, -0.1, 0.1), var) for grad, var in gvs]
+        minimize = optimizer.apply_gradients(capped_gvs)
 
-        minimize = optimizer.minimize(loss_total)
+        #minimize = optimizer.minimize(loss_total)
         return s_t, a_t, r_t, minimize, [loss_total, tf.reduce_mean(r_t), tf.reduce_mean(loss_policy),tf.reduce_mean(loss_value),tf.reduce_mean(entropy)]
 
     def optimize(self):
@@ -414,10 +413,13 @@ for layer in brain.model.layers:
 
 import matplotlib.pyplot as plt
 plt.plot(loss_history)
-plt.ylabel('some numbers')
+plt.ylabel('Loss')
+plt.xlabel('Batch')
 plt.show()
 
 plt.plot(reward_history)
+plt.ylabel('Reward')
+plt.xlabel('Batch')
 plt.show()
 
 printp = True
