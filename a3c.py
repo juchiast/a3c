@@ -13,7 +13,7 @@ import sys
 
 #-- constants
 
-RUN_TIME = 300
+RUN_TIME = 30
 THREADS = 8
 OPTIMIZERS = 1
 THREAD_DELAY = 0
