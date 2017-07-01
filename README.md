@@ -18,6 +18,7 @@ Some training analysis:
 - tensorflow 1.2
 - Keras 2.0.5
 - pygame 1.9.3
+- matplotlib 2.0.2
 
 ## Run
 
