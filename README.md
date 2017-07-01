@@ -24,3 +24,18 @@ Some training analysis:
 
 - Run `make` to continue trainning and run display the results.
 - Run `make game` to test the visualizer.
+
+# License
+
+```
+ Copyright (C) 2017 Omega Team
+
+ Everyone is permitted to copy and distribute verbatim or modified 
+ copies of this license document, and changing it is allowed as long 
+ as the name is changed. 
+
+            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION 
+
+  0. You just DO WHAT THE FUCK YOU WANT TO.
+```
